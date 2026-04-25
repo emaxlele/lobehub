@@ -8,7 +8,7 @@ import {
 import { AgentRuntime, computeStepContext, GeneralChatAgent } from '@lobechat/agent-runtime';
 import { createPathScopeAudit } from '@lobechat/builtin-tool-local-system';
 import { PageAgentIdentifier } from '@lobechat/builtin-tool-page-agent';
-import { manualModeExcludeToolIds } from '@lobechat/builtin-tools';
+import { builtinToolArgsSchemas, manualModeExcludeToolIds } from '@lobechat/builtin-tools';
 import { isDesktop } from '@lobechat/const';
 import { generateToolsFromManifest, type ToolsEngine } from '@lobechat/context-engine';
 import { buildTaskDetailPrompt, buildTaskListPrompt } from '@lobechat/prompts';
@@ -508,6 +508,7 @@ export class StreamingExecutorActionImpl {
       dynamicInterventionAudits,
       operationId: `${messageKey}/${params.parentMessageId}`,
       modelRuntimeConfig,
+      toolArgsSchemas: builtinToolArgsSchemas,
     });
 
     const runtime = new AgentRuntime(agent, {

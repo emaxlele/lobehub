@@ -17,6 +17,17 @@ const FieldInput = memo<{
   onPressEnter?: () => void;
   value?: string | string[];
 }>(({ field, value, onChange, onPressEnter }) => {
+  // Controlled open state to filter out dismiss events caused by the
+  // surrounding ChatInput host (pointerdown on editor triggers base-ui's
+  // outside-press/focus-out, closing the popup the moment it opens).
+  const [selectOpen, setSelectOpen] = useState(false);
+  const handleSelectOpenChange = useCallback((next: boolean, details?: { reason?: string }) => {
+    if (!next && (details?.reason === 'outside-press' || details?.reason === 'focus-out')) {
+      return;
+    }
+    setSelectOpen(next);
+  }, []);
+
   switch (field.kind) {
     case 'textarea': {
       return (
@@ -32,12 +43,14 @@ const FieldInput = memo<{
     case 'select': {
       return (
         <Select
+          open={selectOpen}
           options={field.options?.map((o) => ({ label: o.label, value: o.value }))}
           placeholder={field.placeholder}
           style={{ width: '100%' }}
           value={value as string}
           variant={'filled'}
           onChange={(v) => onChange(field.key, v as string)}
+          onOpenChange={handleSelectOpenChange}
         />
       );
     }
@@ -45,12 +58,14 @@ const FieldInput = memo<{
       return (
         <Select
           mode="multiple"
+          open={selectOpen}
           options={field.options?.map((o) => ({ label: o.label, value: o.value }))}
           placeholder={field.placeholder}
           style={{ width: '100%' }}
           value={value as string[]}
           variant={'filled'}
           onChange={(v) => onChange(field.key, v as string[])}
+          onOpenChange={handleSelectOpenChange}
         />
       );
     }

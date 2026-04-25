@@ -1,7 +1,19 @@
 import type { BuiltinToolManifest } from '@lobechat/types';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
+import { askUserQuestionArgsSchema } from './schemas';
 import { systemPrompt } from './systemRole';
 import { UserInteractionApiName, UserInteractionIdentifier } from './types';
+
+const askUserQuestionParameters = (() => {
+  const schema = zodToJsonSchema(askUserQuestionArgsSchema, {
+    target: 'openApi3',
+  }) as Record<string, any>;
+  // Remove meta-schema markers that LLM providers don't need.
+  delete schema.$schema;
+  delete schema.$ref;
+  return schema;
+})();
 
 export const UserInteractionManifest: BuiltinToolManifest = {
   api: [
@@ -10,61 +22,8 @@ export const UserInteractionManifest: BuiltinToolManifest = {
         'Create a UI-mediated interaction request with either structured form fields or freeform input. Returns the request in pending state.',
       humanIntervention: 'always',
       name: UserInteractionApiName.askUserQuestion,
+      parameters: askUserQuestionParameters,
       renderDisplayControl: 'collapsed',
-      parameters: {
-        properties: {
-          question: {
-            properties: {
-              description: { type: 'string' },
-              fields: {
-                items: {
-                  properties: {
-                    key: { type: 'string' },
-                    kind: {
-                      enum: ['multiselect', 'select', 'text', 'textarea'],
-                      type: 'string',
-                    },
-                    label: { type: 'string' },
-                    options: {
-                      items: {
-                        properties: {
-                          label: { type: 'string' },
-                          value: { type: 'string' },
-                        },
-                        required: ['label', 'value'],
-                        type: 'object',
-                      },
-                      type: 'array',
-                    },
-                    placeholder: { type: 'string' },
-                    required: { type: 'boolean' },
-                    value: {
-                      oneOf: [{ type: 'string' }, { items: { type: 'string' }, type: 'array' }],
-                    },
-                  },
-                  required: ['key', 'kind', 'label'],
-                  type: 'object',
-                },
-                type: 'array',
-              },
-              id: { type: 'string' },
-              metadata: {
-                additionalProperties: true,
-                type: 'object',
-              },
-              mode: {
-                enum: ['form', 'freeform'],
-                type: 'string',
-              },
-              prompt: { type: 'string' },
-            },
-            required: ['id', 'mode', 'prompt'],
-            type: 'object',
-          },
-        },
-        required: ['question'],
-        type: 'object',
-      },
     },
     {
       description:

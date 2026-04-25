@@ -1,5 +1,6 @@
 export * from './ExecutionRuntime';
 export { UserInteractionManifest } from './manifest';
+export { askUserQuestionArgsSchema, userInteractionArgsSchemas } from './schemas';
 export { systemPrompt } from './systemRole';
 export {
   type AskUserQuestionArgs,

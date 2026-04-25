@@ -266,3 +266,5 @@ const recommendedBuiltinIds = new Set(
 export const defaultUninstalledBuiltinTools = builtinTools
   .filter((t) => !t.hidden && !recommendedBuiltinIds.has(t.identifier))
   .map((t) => t.identifier);
+
+export { builtinToolArgsSchemas } from './argsSchemas';

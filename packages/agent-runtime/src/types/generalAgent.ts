@@ -4,6 +4,7 @@ import {
   type GlobalInterventionAuditConfig,
   type MessageToolCall,
 } from '@lobechat/types';
+import type { ZodTypeAny } from 'zod';
 
 export interface GeneralAgentCallLLMInstructionPayload {
   /** Force create a new assistant message (e.g., after compression) */
@@ -106,6 +107,9 @@ export interface GeneralAgentConfig {
     provider: string;
   };
   operationId: string;
+  // Keyed by [identifier][apiName]. Inject via import — schemas don't
+  // survive TRPC/JSON boundaries. See @lobechat/builtin-tools/argsSchemas.
+  toolArgsSchemas?: Record<string, Record<string, ZodTypeAny>>;
   userId?: string;
 }
 

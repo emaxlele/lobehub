@@ -47,7 +47,8 @@
     "@lobechat/const": "workspace:*"
   },
   "devDependencies": {
-    "@lobechat/types": "workspace:*"
+    "@lobechat/types": "workspace:*",
+    "zod": "^3.25.76"
   },
   "peerDependencies": {
     "@lobehub/ui": "^5",

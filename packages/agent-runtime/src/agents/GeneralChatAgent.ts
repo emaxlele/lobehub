@@ -39,6 +39,12 @@ import { shouldCompress } from '../utils/tokenCounter';
  * 3. tools_batch_result → call_llm (process tool results)
  *
  */
+
+interface ParsedToolCall {
+  toolArgs: Record<string, any>;
+  toolCalling: ChatToolPayload;
+}
+
 export class GeneralChatAgent implements Agent {
   private config: GeneralAgentConfig;
 
@@ -117,13 +123,48 @@ export class GeneralChatAgent implements Agent {
     );
   }
 
-  /**
-   * Check if tool calls need human intervention
-   * Combines user's global config with tool's own config
-   * Returns [toolsNeedingIntervention, toolsToExecute]
-   */
+  private parseToolCallArgs(toolsCalling: ChatToolPayload[]): ParsedToolCall[] {
+    return toolsCalling.map((toolCalling) => {
+      let toolArgs: Record<string, any> = {};
+      try {
+        toolArgs = JSON.parse(toolCalling.arguments || '{}');
+      } catch {
+        // Invalid JSON, treat as empty args
+      }
+      return { toolArgs, toolCalling };
+    });
+  }
+
+  // Schemas live outside the manifest because Zod prototype methods get
+  // stripped on TRPC/JSON boundaries — must be injected via config, not
+  // serialized. Missing schema → passes through (opt-in).
+  private validateToolArgs(parsed: ParsedToolCall[]): {
+    invalid: ParsedToolCall[];
+    valid: ParsedToolCall[];
+  } {
+    const valid: ParsedToolCall[] = [];
+    const invalid: ParsedToolCall[] = [];
+
+    for (const entry of parsed) {
+      const { identifier, apiName } = entry.toolCalling;
+      const argsSchema = this.config.toolArgsSchemas?.[identifier]?.[apiName];
+
+      if (argsSchema && typeof argsSchema.safeParse === 'function') {
+        const result = argsSchema.safeParse(entry.toolArgs);
+        if (!result.success) {
+          invalid.push(entry);
+          continue;
+        }
+      }
+
+      valid.push(entry);
+    }
+
+    return { invalid, valid };
+  }
+
   private async checkInterventionNeeded(
-    toolsCalling: ChatToolPayload[],
+    parsed: ParsedToolCall[],
     state: AgentState,
   ): Promise<[ChatToolPayload[], ChatToolPayload[]]> {
     const toolsNeedingIntervention: ChatToolPayload[] = [];
@@ -142,17 +183,9 @@ export class GeneralChatAgent implements Agent {
     // Global audits: default to security blacklist audit if not provided
     const globalResolvers = this.config.globalInterventionAudits ?? createDefaultGlobalAudits();
 
-    for (const toolCalling of toolsCalling) {
+    for (const { toolArgs, toolCalling } of parsed) {
       const { identifier, apiName } = toolCalling;
       const toolKey = `${identifier}/${apiName}`;
-
-      // Parse arguments for intervention checking
-      let toolArgs: Record<string, any> = {};
-      try {
-        toolArgs = JSON.parse(toolCalling.arguments || '{}');
-      } catch {
-        // Invalid JSON, treat as empty args
-      }
 
       // Phase 1: Run global resolvers (e.g., security blacklist)
       let globalBlocked = false;
@@ -433,11 +466,14 @@ export class GeneralChatAgent implements Agent {
           context.payload as GeneralAgentCallLLMResultPayload;
 
         if (hasToolsCalling && toolsCalling && toolsCalling.length > 0) {
-          // Check which tools need human intervention
+          const parsed = this.parseToolCallArgs(toolsCalling);
+          const { invalid, valid } = this.validateToolArgs(parsed);
           const [toolsNeedingIntervention, toolsToExecute] = await this.checkInterventionNeeded(
-            toolsCalling,
+            valid,
             state,
           );
+          // Invalid → executor; handler's own validation emits the error tool_result
+          for (const entry of invalid) toolsToExecute.push(entry.toolCalling);
 
           const instructions: AgentInstruction[] = [];
 

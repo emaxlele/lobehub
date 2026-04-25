@@ -1,5 +1,6 @@
 import { type ChatToolPayload, type GlobalInterventionAuditConfig } from '@lobechat/types';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { type AgentRuntimeContext, type AgentState } from '../../types';
 import { GeneralChatAgent } from '../GeneralChatAgent';
@@ -2718,6 +2719,167 @@ describe('GeneralChatAgent', () => {
             parentMessageId: 'msg-1',
             toolsCalling: [tool1, tool2],
           },
+        },
+      ]);
+    });
+  });
+
+  describe('pre-intervention argsSchema validation', () => {
+    // Use a minimal Zod schema shaped like askUserQuestion to keep the test
+    // self-contained (avoids depending on the builtin-tool-user-interaction
+    // package from within agent-runtime tests).
+    const askLikeSchema = z.object({
+      question: z
+        .object({
+          id: z.string(),
+          mode: z.enum(['form', 'freeform']),
+          prompt: z.string(),
+        })
+        .strict(),
+    });
+
+    const toolArgsSchemas = {
+      'user-interaction': { askUserQuestion: askLikeSchema },
+    };
+
+    const makeManifestMap = () => ({
+      'user-interaction': {
+        identifier: 'user-interaction',
+        api: [
+          {
+            name: 'askUserQuestion',
+            description: 'ask',
+            parameters: {},
+            humanIntervention: 'always' as const,
+          },
+        ],
+      },
+    });
+
+    it('bypasses intervention when argsSchema validation fails on an "always" tool', async () => {
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+        toolArgsSchemas,
+      });
+
+      // LLM stringified the nested question object — real-world failure mode.
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'user-interaction',
+        apiName: 'askUserQuestion',
+        arguments: JSON.stringify({
+          question: JSON.stringify({ id: 'x', mode: 'form', prompt: 'pick' }),
+        }),
+        type: 'default',
+      };
+
+      const state = createMockState({ toolManifestMap: makeManifestMap() });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      // Routed to execute — handler will produce an error tool_result
+      // that the LLM can use to regenerate the call.
+      expect(result).toEqual([
+        {
+          type: 'call_tool',
+          payload: {
+            parentMessageId: 'msg-1',
+            toolCalling: toolCall,
+          },
+        },
+      ]);
+    });
+
+    it('still routes to intervention when args are valid', async () => {
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+        toolArgsSchemas,
+      });
+
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'user-interaction',
+        apiName: 'askUserQuestion',
+        arguments: JSON.stringify({
+          question: { id: 'x', mode: 'freeform', prompt: 'pick' },
+        }),
+        type: 'default',
+      };
+
+      const state = createMockState({ toolManifestMap: makeManifestMap() });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      expect(result).toEqual([
+        {
+          type: 'request_human_approve',
+          pendingToolsCalling: [toolCall],
+          reason: 'human_intervention_required',
+        },
+      ]);
+    });
+
+    it('is a no-op when no schema is registered for the tool (backward compatible)', async () => {
+      // Agent has NO toolArgsSchemas config at all — legacy path.
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+      });
+
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'legacy-tool',
+        apiName: 'doThing',
+        arguments: '{"wat": "still goes to intervention"}',
+        type: 'default',
+      };
+
+      const state = createMockState({
+        toolManifestMap: {
+          'legacy-tool': {
+            identifier: 'legacy-tool',
+            api: [
+              {
+                name: 'doThing',
+                description: 'legacy',
+                parameters: {},
+                humanIntervention: 'always',
+              },
+            ],
+          },
+        },
+      });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      expect(result).toEqual([
+        {
+          type: 'request_human_approve',
+          pendingToolsCalling: [toolCall],
+          reason: 'human_intervention_required',
         },
       ]);
     });

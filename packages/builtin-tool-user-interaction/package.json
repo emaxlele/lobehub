@@ -10,7 +10,9 @@
   },
   "main": "./src/index.ts",
   "devDependencies": {
-    "@lobechat/types": "workspace:*"
+    "@lobechat/types": "workspace:*",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1"
   },
   "peerDependencies": {
     "@lobehub/ui": "^5",

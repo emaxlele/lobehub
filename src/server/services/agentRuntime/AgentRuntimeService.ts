@@ -6,6 +6,7 @@ import type {
 } from '@lobechat/agent-runtime';
 import { AgentRuntime, findInMessages, GeneralChatAgent } from '@lobechat/agent-runtime';
 import type { ISnapshotStore } from '@lobechat/agent-tracing';
+import { builtinToolArgsSchemas } from '@lobechat/builtin-tools';
 import { dynamicInterventionAudits } from '@lobechat/builtin-tools/dynamicInterventionAudits';
 import { AgentRuntimeErrorType, ChatErrorType, type ChatMessageError } from '@lobechat/types';
 import debug from 'debug';
@@ -1456,6 +1457,7 @@ export class AgentRuntimeService {
       dynamicInterventionAudits,
       modelRuntimeConfig: metadata?.modelRuntimeConfig,
       operationId,
+      toolArgsSchemas: builtinToolArgsSchemas,
       userId: metadata?.userId,
     };
 
