@@ -51,7 +51,7 @@ describe('webOnboardingExecutor', () => {
     );
 
     expect(saveUserQuestionApi).toMatchObject({
-      description: expect.stringContaining('agentName and agentEmoji'),
+      description: expect.stringContaining('require user confirmation'),
       humanIntervention: [
         {
           match: { agentName: { pattern: '\\S', type: 'regex' } },
@@ -59,6 +59,14 @@ describe('webOnboardingExecutor', () => {
         },
         {
           match: { agentEmoji: { pattern: '\\S', type: 'regex' } },
+          policy: 'always',
+        },
+        {
+          match: { fullName: { pattern: '\\S', type: 'regex' } },
+          policy: 'always',
+        },
+        {
+          match: { responseLanguage: { pattern: '\\S', type: 'regex' } },
           policy: 'always',
         },
         { policy: 'never' },
@@ -80,7 +88,7 @@ describe('webOnboardingExecutor', () => {
     });
   });
 
-  it('requires approval only when saveUserQuestion updates agent identity fields', () => {
+  it('requires approval for agent identity and user profile fields, bypasses interests-only saves', () => {
     const saveUserQuestionApi = WebOnboardingManifest.api.find(
       (api) => api.name === WebOnboardingApiName.saveUserQuestion,
     );
@@ -93,29 +101,19 @@ describe('webOnboardingExecutor', () => {
       throw new TypeError('saveUserQuestion humanIntervention must use static rules');
     }
 
-    expect(
+    const intervene = (toolArgs: Record<string, unknown>) =>
       InterventionChecker.shouldIntervene({
         config: humanIntervention,
         securityBlacklist: [],
-        toolArgs: { agentName: 'Atlas' },
-      }),
-    ).toBe('always');
+        toolArgs,
+      });
 
-    expect(
-      InterventionChecker.shouldIntervene({
-        config: humanIntervention,
-        securityBlacklist: [],
-        toolArgs: { agentEmoji: '🛰️' },
-      }),
-    ).toBe('always');
-
-    expect(
-      InterventionChecker.shouldIntervene({
-        config: humanIntervention,
-        securityBlacklist: [],
-        toolArgs: { fullName: 'Ada Lovelace' },
-      }),
-    ).toBe('never');
+    expect(intervene({ agentName: 'Atlas' })).toBe('always');
+    expect(intervene({ agentEmoji: '🛰️' })).toBe('always');
+    expect(intervene({ fullName: 'Ada Lovelace' })).toBe('always');
+    expect(intervene({ responseLanguage: 'en-US' })).toBe('always');
+    expect(intervene({ fullName: 'Ada', responseLanguage: 'en-US' })).toBe('always');
+    expect(intervene({ interests: ['AI tooling'] })).toBe('never');
   });
 
   it('calls finishOnboarding service and syncs user state', async () => {
