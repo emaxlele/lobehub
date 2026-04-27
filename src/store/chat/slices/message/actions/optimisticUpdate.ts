@@ -232,6 +232,12 @@ export class MessageOptimisticUpdateActionImpl {
     const toolMessage = dbMessageSelectors.getDbMessageById(id)(this.#get());
 
     internal_dispatchMessage({ id, type: 'updateMessagePlugin', value }, context);
+    if (value.intervention) {
+      internal_dispatchMessage(
+        { id, type: 'updateMessage', value: { pluginIntervention: value.intervention } },
+        context,
+      );
+    }
 
     if (toolMessage?.parentId && toolMessage.tool_call_id) {
       internal_dispatchMessage(

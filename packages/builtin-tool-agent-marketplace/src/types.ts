@@ -64,7 +64,7 @@ export interface AgentTemplate {
 
 /**
  * Args to open the Marketplace picker.
- * categoryHints must contain at least one MarketplaceCategory slug.
+ * categoryHints must contain at least one MarketplaceCategory slug and controls tab priority.
  */
 export interface ShowAgentMarketplaceArgs {
   categoryHints: MarketplaceCategory[];

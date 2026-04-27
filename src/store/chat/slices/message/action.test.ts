@@ -1055,6 +1055,50 @@ describe('chatMessage actions', () => {
       );
     });
 
+    it('should sync intervention status into standalone tool message pluginIntervention', async () => {
+      const { result } = renderHook(() => useChatStore());
+      vi.spyOn(messageService, 'updateMessagePlugin').mockResolvedValue({ success: true });
+      const toolMessage = {
+        content: '',
+        id: 'tool-message-id',
+        plugin: {
+          apiName: 'showAgentMarketplace',
+          arguments: '{}',
+          identifier: 'lobe-agent-marketplace',
+          intervention: { status: 'pending' },
+        },
+        pluginIntervention: { status: 'pending' },
+        role: 'tool',
+        tool_call_id: 'tool-call-id',
+      } as UIChatMessage;
+
+      act(() => {
+        useChatStore.setState({
+          activeAgentId: 'session-id',
+          activeTopicId: 'topic-id',
+          dbMessagesMap: {
+            [messageMapKey({ agentId: 'session-id', topicId: 'topic-id' })]: [toolMessage],
+          },
+          messagesMap: {
+            [messageMapKey({ agentId: 'session-id', topicId: 'topic-id' })]: [toolMessage],
+          },
+        });
+      });
+
+      await act(async () => {
+        await result.current.optimisticUpdateMessagePlugin(toolMessage.id, {
+          intervention: { status: 'approved' },
+        });
+      });
+
+      const updatedMessage =
+        useChatStore.getState().messagesMap[
+          messageMapKey({ agentId: 'session-id', topicId: 'topic-id' })
+        ][0];
+
+      expect(updatedMessage.pluginIntervention).toEqual({ status: 'approved' });
+    });
+
     it('should use context operationId when provided', async () => {
       const { result } = renderHook(() => useChatStore());
       const messageId = 'message-id';

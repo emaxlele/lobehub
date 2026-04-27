@@ -1,3 +1,4 @@
+import { AgentMarketplaceIdentifier } from '@lobechat/builtin-tool-agent-marketplace';
 import { ChatInput } from '@lobehub/editor/react';
 import { memo, useCallback, useMemo, useState } from 'react';
 
@@ -33,8 +34,17 @@ const InterventionBar = memo<InterventionBarProps>(({ interventions }) => {
   const activeIntervention = interventions[activeIndex];
   if (!activeIntervention) return null;
 
+  const isFloatingIntervention = activeIntervention.identifier === AgentMarketplaceIdentifier;
+
   return (
-    <ChatInput className={styles.container} maxHeight={'50vh' as any} resize={false}>
+    <ChatInput
+      className={styles.container}
+      maxHeight={'50vh' as any}
+      resize={false}
+      styles={
+        isFloatingIntervention ? { body: { overflow: 'visible', position: 'relative' } } : undefined
+      }
+    >
       {interventions.length > 1 && (
         <InterventionTabBar
           activeIndex={activeIndex}
@@ -42,7 +52,11 @@ const InterventionBar = memo<InterventionBarProps>(({ interventions }) => {
           onTabChange={handleTabChange}
         />
       )}
-      <InterventionContent intervention={activeIntervention} key={activeIntervention.toolCallId} />
+      <InterventionContent
+        floating={isFloatingIntervention}
+        intervention={activeIntervention}
+        key={activeIntervention.toolCallId}
+      />
     </ChatInput>
   );
 });

@@ -1,4 +1,3 @@
-import { UserInteractionIdentifier } from '@lobechat/builtin-tool-user-interaction';
 import { getBuiltinIntervention } from '@lobechat/builtin-tools/interventions';
 import { safeParseJSON } from '@lobechat/utils';
 import { Flexbox } from '@lobehub/ui';
@@ -11,6 +10,10 @@ import { toolInterventionSelectors } from '@/store/user/selectors';
 import { useConversationStore } from '../../../../../store';
 import Arguments from '../Arguments';
 import ApprovalActions from './ApprovalActions';
+import {
+  isCustomInteractionIdentifier,
+  prepareCustomInteractionSubmit,
+} from './customInteractionHandlers';
 import Fallback from './Fallback';
 import KeyValueEditor from './KeyValueEditor';
 import SecurityBlacklistWarning from './SecurityBlacklistWarning';
@@ -88,7 +91,7 @@ const Intervention = memo<InterventionProps>(
 
     const parsedArgs = useMemo(() => safeParseJSON(requestArgs || '') ?? {}, [requestArgs]);
 
-    const isCustomInteraction = identifier === UserInteractionIdentifier;
+    const isCustomInteraction = isCustomInteractionIdentifier(identifier);
 
     const submitToolInteraction = useConversationStore((s) => s.submitToolInteraction);
     const skipToolInteraction = useConversationStore((s) => s.skipToolInteraction);
@@ -103,7 +106,8 @@ const Intervention = memo<InterventionProps>(
       ) => {
         switch (action.type) {
           case 'submit': {
-            await submitToolInteraction(id, action.payload);
+            const result = await prepareCustomInteractionSubmit(identifier, action.payload);
+            await submitToolInteraction(id, result.payload, result.options);
             break;
           }
           case 'skip': {
@@ -116,7 +120,7 @@ const Intervention = memo<InterventionProps>(
           }
         }
       },
-      [id, submitToolInteraction, skipToolInteraction, cancelToolInteraction],
+      [id, identifier, submitToolInteraction, skipToolInteraction, cancelToolInteraction],
     );
 
     const BuiltinToolInterventionRender = getBuiltinIntervention(identifier, apiName);

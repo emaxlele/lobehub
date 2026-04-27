@@ -1167,6 +1167,91 @@ describe('ConversationControl actions', () => {
         }),
       );
     });
+
+    it('should resume runtime from the tool message without creating user message when requested', async () => {
+      const { result } = renderHook(() => useChatStore());
+
+      const agentId = 'global-agent';
+      const topicId = 'global-topic';
+      const chatKey = messageMapKey({ agentId, topicId });
+      const response = {
+        installedAgentIds: ['local-agent-1'],
+        selectedTemplateIds: ['pair-programmer'],
+      };
+
+      const toolMessage = createMockMessage({
+        groupId: 'group-1',
+        id: 'tool-msg-1',
+        plugin: {
+          apiName: 'showAgentMarketplace',
+          arguments: '{}',
+          identifier: 'lobe-agent-marketplace',
+          type: 'default',
+        },
+        role: 'tool',
+      });
+
+      act(() => {
+        useChatStore.setState({
+          activeAgentId: agentId,
+          activeTopicId: topicId,
+          activeThreadId: undefined,
+          dbMessagesMap: {
+            [chatKey]: [toolMessage],
+          },
+          messagesMap: {
+            [chatKey]: [toolMessage],
+          },
+        });
+      });
+
+      vi.spyOn(result.current, 'optimisticUpdateMessagePlugin').mockResolvedValue(undefined);
+      vi.spyOn(result.current, 'optimisticUpdateMessageContent').mockResolvedValue(undefined);
+      const optimisticCreateMessageSpy = vi.spyOn(result.current, 'optimisticCreateMessage');
+
+      const initialContext = { phase: 'init' } as any;
+      const internal_createAgentStateSpy = vi
+        .spyOn(result.current, 'internal_createAgentState')
+        .mockReturnValue({
+          agentConfig: createMockResolvedAgentConfig(),
+          context: initialContext,
+          state: {} as any,
+        });
+      const internal_execAgentRuntimeSpy = vi
+        .spyOn(result.current, 'internal_execAgentRuntime')
+        .mockResolvedValue(undefined);
+
+      await act(async () => {
+        await result.current.submitToolInteraction('tool-msg-1', response, undefined, {
+          createUserMessage: false,
+        });
+      });
+
+      expect(optimisticCreateMessageSpy).not.toHaveBeenCalled();
+      expect(internal_createAgentStateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({ id: 'tool-msg-1', role: 'tool' }),
+          ]),
+          parentMessageId: 'tool-msg-1',
+        }),
+      );
+      expect(internal_execAgentRuntimeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialContext: expect.objectContaining({
+            payload: expect.objectContaining({
+              data: response,
+              isSuccess: true,
+              parentMessageId: 'tool-msg-1',
+              toolCallId: 'tool-msg-1',
+            }),
+            phase: 'tool_result',
+          }),
+          parentMessageId: 'tool-msg-1',
+          parentMessageType: 'tool',
+        }),
+      );
+    });
   });
 
   describe('skipToolInteraction', () => {

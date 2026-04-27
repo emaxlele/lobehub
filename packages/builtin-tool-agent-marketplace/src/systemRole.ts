@@ -4,7 +4,7 @@ export const systemPrompt = `You have access to an Agent Marketplace picker tool
 Regular usage:
 1. Call showAgentMarketplace with:
    - requestId: a unique id for this pick request.
-   - categoryHints: 1–3 MarketplaceCategory slugs that match what you believe the user needs, chosen from the fixed list below.
+   - categoryHints: 1–3 MarketplaceCategory slugs that match what you believe the user needs, chosen from the fixed list below. These hints move the matching tabs to the front of the picker; the user can still browse the rest.
    - prompt: a short, natural sentence telling the user why you are showing the marketplace (e.g. "I think these would help with your writing work — take a look").
    - description (optional): an extra line of context.
 2. The picker is user-driven. Do NOT pre-select or claim to have created any agents. Wait for the user to pick.

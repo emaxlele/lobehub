@@ -11,7 +11,7 @@ export const AgentMarketplaceManifest: BuiltinToolManifest = {
   api: [
     {
       description:
-        'Open an Agent Marketplace picker card in the UI, filtered by the provided category hints. Returns the request in pending state.',
+        'Open an Agent Marketplace picker card in the UI, prioritizing tabs by the provided category hints. Returns the request in pending state.',
       humanIntervention: 'always',
       name: AgentMarketplaceApiName.showAgentMarketplace,
       renderDisplayControl: 'collapsed',
@@ -19,7 +19,7 @@ export const AgentMarketplaceManifest: BuiltinToolManifest = {
         properties: {
           categoryHints: {
             description:
-              'One or more fixed MarketplaceCategory slugs used to pre-filter the picker.',
+              'One or more fixed MarketplaceCategory slugs used to move matching picker tabs to the front.',
             items: {
               enum: [...MARKETPLACE_CATEGORY_VALUES],
               type: 'string',

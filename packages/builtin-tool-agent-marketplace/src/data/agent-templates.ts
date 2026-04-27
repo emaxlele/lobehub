@@ -817,5 +817,18 @@ export const getTemplatesByCategories = (categories: string[]): AgentTemplate[] 
   return AGENT_TEMPLATES.filter((t) => set.has(t.category));
 };
 
+export const getTemplatesByCategoryPriority = (categories: string[]): AgentTemplate[] => {
+  if (categories.length === 0) return AGENT_TEMPLATES;
+
+  const priority = new Map(categories.map((category, index) => [category, index]));
+
+  return [...AGENT_TEMPLATES].sort((a, b) => {
+    const aPriority = priority.get(a.category) ?? Number.MAX_SAFE_INTEGER;
+    const bPriority = priority.get(b.category) ?? Number.MAX_SAFE_INTEGER;
+
+    return aPriority - bPriority;
+  });
+};
+
 export const getTemplateById = (id: string): AgentTemplate | undefined =>
   AGENT_TEMPLATES.find((t) => t.id === id);

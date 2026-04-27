@@ -13,6 +13,10 @@ import { messageMapKey } from '../../../utils/messageMapKey';
 import { type OptimisticUpdateContext } from '../../message/actions/optimisticUpdate';
 import { dbMessageSelectors } from '../../message/selectors';
 
+interface SubmitToolInteractionOptions {
+  createUserMessage?: boolean;
+}
+
 /**
  * Actions for controlling conversation operations like cancellation and error handling
  */
@@ -303,6 +307,7 @@ export class ConversationControlActionImpl {
     toolMessageId: string,
     response: Record<string, unknown>,
     context?: ConversationContext,
+    options: SubmitToolInteractionOptions = {},
   ): Promise<void> => {
     const { internal_execAgentRuntime, startOperation, completeOperation } = this.#get();
 
@@ -337,13 +342,65 @@ export class ConversationControlActionImpl {
       optimisticContext,
     );
 
-    const toolContent = `User submitted: ${JSON.stringify(response)}`;
+    const toolContent =
+      options.createUserMessage === false
+        ? `Tool interaction completed: ${JSON.stringify(response)}`
+        : `User submitted: ${JSON.stringify(response)}`;
     await this.#get().optimisticUpdateMessageContent(
       toolMessageId,
       toolContent,
       undefined,
       optimisticContext,
     );
+
+    if (options.createUserMessage === false) {
+      const chatKey = messageMapKey({ agentId, topicId, threadId, scope });
+      const currentMessages = displayMessageSelectors.getDisplayMessagesByKey(chatKey)(this.#get());
+
+      const { state, context: initialContext } = this.#get().internal_createAgentState({
+        messages: currentMessages,
+        parentMessageId: toolMessageId,
+        agentId,
+        topicId,
+        threadId: threadId ?? undefined,
+        operationId,
+      });
+
+      const agentRuntimeContext: AgentRuntimeContext = {
+        ...initialContext,
+        payload: {
+          data: response,
+          executionTime: 0,
+          isSuccess: true,
+          parentMessageId: toolMessageId,
+          toolCall: toolMessage.plugin,
+          toolCallId: toolMessage.tool_call_id ?? toolMessageId,
+        },
+        phase: 'tool_result',
+      };
+
+      try {
+        await internal_execAgentRuntime({
+          context: effectiveContext,
+          messages: currentMessages,
+          parentMessageId: toolMessageId,
+          parentMessageType: 'tool',
+          initialState: state,
+          initialContext: agentRuntimeContext,
+          parentOperationId: operationId,
+        });
+        completeOperation(operationId);
+      } catch (error) {
+        const err = error as Error;
+        console.error('[submitToolInteraction] Error executing agent runtime:', err);
+        this.#get().failOperation(operationId, {
+          type: 'submitToolInteraction',
+          message: err.message || 'Unknown error',
+        });
+      }
+
+      return;
+    }
 
     // 2. Create a user message summarizing the response (makes conversation natural)
     const userMessageContent = Object.values(response).join(', ');
