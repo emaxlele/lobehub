@@ -68,8 +68,10 @@ const InputArea = () => {
   );
 
   const hideStarterList = inputActiveMode && ['agent', 'group', 'write'].includes(inputActiveMode);
-  const showSuggestQuestions =
-    !inputActiveMode || ['agent', 'group', 'write'].includes(inputActiveMode);
+  // Temporarily hidden: SuggestQuestions + CommunityRecommend block. The slot below
+  // StarterList is reserved for an upcoming auto-generated module. Keep the code
+  // in place so it can be revived later.
+  const showSuggestQuestions = false;
 
   const extraActionItems = useMemo(
     () =>

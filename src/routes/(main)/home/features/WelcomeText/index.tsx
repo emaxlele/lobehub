@@ -1,4 +1,4 @@
-import { Center } from '@lobehub/ui';
+import { Flexbox } from '@lobehub/ui';
 import { sample } from 'es-toolkit/compat';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,15 +12,14 @@ const WelcomeText = memo(() => {
   }, [t]);
 
   return (
-    <Center
+    <Flexbox
       style={{
-        fontSize: 28,
-        fontWeight: 'bold',
-        marginBlock: '36px 24px',
+        fontSize: 16,
+        paddingInlineStart: 5,
       }}
     >
       {sentence}
-    </Center>
+    </Flexbox>
   );
 });
 
