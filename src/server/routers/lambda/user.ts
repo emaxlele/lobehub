@@ -272,6 +272,7 @@ export const userRouter = router({
     ]);
 
     return {
+      finished: state.finished,
       personaContent: persona?.persona || null,
       phaseGuidance: formatWebOnboardingStateMessage(state),
       soulContent: soulDoc?.content || null,

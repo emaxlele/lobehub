@@ -43,6 +43,7 @@ export class UserService {
   };
 
   getOnboardingAgentContext = async (): Promise<{
+    finished?: boolean;
     personaContent: string | null;
     phaseGuidance: string;
     soulContent: string | null;
