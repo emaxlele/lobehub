@@ -1,6 +1,4 @@
 import type { TaskTemplate, TaskTemplateSkillSource } from '@lobechat/const';
-import { createNanoId } from '@lobechat/utils';
-import { useSessionStorageState } from 'ahooks';
 import { App } from 'antd';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +23,6 @@ export type DailyBriefRecommendationsUIState =
       mode: 'cards';
       onCreated: (templateId: string) => void;
       onDismiss: (templateId: string) => void;
-      onRefresh: () => void;
       templates: TaskTemplate[];
     };
 
@@ -48,9 +45,6 @@ export function useDailyBriefRecommendationsUI(
   const interestKeys = useResolvedInterestKeys();
   const swrKey = interestKeys ? [...interestKeys].sort().join(',') : '';
   const swrEnabled = isLogin && interestKeys !== null;
-  const [refreshSeed, setRefreshSeed] = useSessionStorageState<string>(REFRESH_SEED_STORAGE_KEY, {
-    defaultValue: '',
-  });
 
   const { data, isLoading, mutate } = useSWR(
     swrEnabled ? ['taskTemplate.listDailyRecommend', swrKey, refreshSeed, count] : null,
@@ -61,10 +55,6 @@ export function useDailyBriefRecommendationsUI(
       }),
     { revalidateOnFocus: false, revalidateOnReconnect: false },
   );
-
-  const handleRefresh = useCallback(() => {
-    setRefreshSeed(nextRefreshSeed());
-  }, [setRefreshSeed]);
 
   const removeTemplateFromList = useCallback(
     (templateId: string) => {
@@ -118,11 +108,5 @@ export function useDailyBriefRecommendationsUI(
   if (!isInit || isLoading) return { mode: 'skeleton' };
   if (templates.length === 0) return { mode: 'hidden' };
 
-  return {
-    mode: 'cards',
-    onCreated: handleCreated,
-    onDismiss: handleDismiss,
-    onRefresh: handleRefresh,
-    templates,
-  };
+  return { mode: 'cards', onCreated: handleCreated, onDismiss: handleDismiss, templates };
 }
