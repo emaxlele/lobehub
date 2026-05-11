@@ -45,11 +45,14 @@ export interface UseSkillConnectionResult {
   nextUnconnected: SkillProviderMeta | undefined;
 }
 
-/**
- * Shared predicate for both `useSkillConnection` and ad-hoc filtering
- * (e.g. hiding already-connected providers from the inline auth list).
- */
-export const useIsSkillConnected = () => {
+export const useSkillConnection = (
+  specs: TaskTemplateSkillRequirement[] | undefined,
+): UseSkillConnectionResult => {
+  const getLobehubAuth = useToolStore((s) => s.getLobehubSkillAuthorizeUrl);
+  const checkLobehubStatus = useToolStore((s) => s.checkLobehubSkillStatus);
+  const createKlavisServer = useToolStore((s) => s.createKlavisServer);
+  const refreshKlavisServerTools = useToolStore((s) => s.refreshKlavisServerTools);
+
   const lobehubServers = useToolStore(lobehubSkillStoreSelectors.getServers);
   const klavisServers = useToolStore(klavisStoreSelectors.getServers);
 
