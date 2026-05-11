@@ -51,7 +51,9 @@ export async function editLocalFile({
     const unifiedLines = rawPatch.split('\n');
     const firstMinusIdx = unifiedLines.findIndex((l) => l.startsWith('--- '));
     const cleanPatch = firstMinusIdx > 0 ? unifiedLines.slice(firstMinusIdx).join('\n') : rawPatch;
-    const diffText = `diff --git a/${filePath} b/${filePath}\n${cleanPatch}`;
+    // Normalize absolute paths (remove leading /) to prevent double slashes in diff header
+    const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    const diffText = `diff --git a/${normalizedPath} b/${normalizedPath}\n${cleanPatch}`;
 
     const patchLines = rawPatch.split('\n');
     let linesAdded = 0;
