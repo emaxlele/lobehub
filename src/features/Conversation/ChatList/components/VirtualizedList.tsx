@@ -30,6 +30,8 @@ import { useAutoScrollEnabled } from './AutoScroll/useAutoScrollEnabled';
 import BackBottom from './BackBottom';
 
 const CONVERSATION_FOOTER_ID = '__conversation_footer__';
+const USER_SCROLL_INTENT_TTL_MS = 500;
+const SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp', ' ']);
 
 interface VirtualizedListProps {
   dataSource: string[];
