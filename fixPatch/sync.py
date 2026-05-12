@@ -59,8 +59,11 @@ def get_canary_version():
     Fallback: package.json se nessun tag trovato.
     """
     ok, out, _ = git_soft(
-        "describe", "--tags", "--abbrev=0", "--match", "v*", "upstream/canary"
+        "describe", "--tags", "--abbrev=0",
+        "--match", "v*", "--exclude", "*nightly*",
+        "upstream/canary"
     )
+    
     if ok and out.strip():
         return out.strip().lstrip("v")
 
@@ -129,11 +132,31 @@ def merge_canary():
     if ok:
         first_line = out.splitlines()[0] if out else "up-to-date"
         print(f"  merge OK (-X theirs): {first_line}")
-        print(f"  upstream canary version: {canary_ver}")
     else:
-        print(f"  [MERGE ERROR] {err}")
-        git_soft("merge", "--abort")
-        sys.exit(1)
+        print("  Conflitti residui (modify/delete, add/add) — risolvo accettando upstream...")
+        _, unmerged, _ = git_soft("diff", "--name-only", "--diff-filter=U")
+        if unmerged.strip():
+            for f in unmerged.strip().splitlines():
+                f = f.strip()
+                if not f:
+                    continue
+                # Prova a prendere la versione upstream
+                ok_co, _, _ = git_soft("checkout", "--theirs", "--", f)
+                if not ok_co:
+                    # File non esiste in upstream → cancellalo
+                    git_soft("rm", "-f", "--", f)
+                else:
+                    git_soft("add", "--", f)
+        # Finalizza il merge commit
+        ok2, _, err2 = git_soft("commit", "--no-edit", "--allow-empty")
+        if ok2:
+            print("  merge OK (conflitti risolti accettando upstream)")
+        else:
+            print(f"  [MERGE ERROR FATALE] {err2}")
+            git_soft("merge", "--abort")
+            sys.exit(1)
+
+    print(f"  upstream canary version: {canary_ver}")
 
 
 # ── step 2: carica e applica patch ─────────────────────────────────────────
