@@ -5,12 +5,12 @@ Uso: C:\Python314\python.exe fixPatch\sync.py [--dry-run]
      (da %USERPROFILE%\Projects\Mio\lobehub, oppure da qualsiasi directory)
 
 Cosa fa in ordine:
-  1. Fetch + merge upstream/canary in emaxlele-dev
+  0. Salva lavoro pending (add + commit + push) — base sicura
+  1. Fetch + merge upstream/canary in emaxlele-dev (-X theirs)
+  1b. Pulizia .github/workflows/
   2. Re-applica tutte le nostre patch (idempotenti: skip se già applicate)
   3. Commit (patch riapplicate + eventuali altre modifiche tracked)
-     Se nessuna modifica e HEAD == upstream/canary HEAD → empty version-bump
-     commit per garantire che emaxlele-dev abbia un commit ESCLUSIVO prima del push.
-  4. Push origin emaxlele-dev  ← solo il branch, NO tag
+  4. Push origin emaxlele-dev  ← solo il branch, NO ta
 
 Il tag di release (vX.Y.Z-emaxlele.N) viene creato dal workflow GitHub Actions
 `emaxlele-build.yml` che si attiva sul push. Il workflow lo crea sul commit HEAD
@@ -48,7 +48,51 @@ DRY_RUN = args.dry_run
 if DRY_RUN:
     print("[DRY-RUN] Nessuna modifica verra effettuata")
 
+def save_pending_work():
+    """Step 0: salva eventuale lavoro pending (add + commit + push) prima del merge."""
+    section("STEP 0 — Salva lavoro pending")
 
+    if DRY_RUN:
+        _, status, _ = git_soft("status", "--porcelain")
+        _, ahead, _ = git_soft("rev-list", "--count", "origin/emaxlele-dev..HEAD")
+        print(f"  [DRY RUN] Modifiche non committate: {'sì' if status.strip() else 'no'}")
+        print(f"  [DRY RUN] Commit non pushati: {ahead.strip() if ahead.strip() else '0'}")
+        return
+
+    # 1) Add + commit se ci sono modifiche tracked/untracked
+    _, status, _ = git_soft("status", "--porcelain")
+    if status.strip():
+        # Filtra: ignora file in fixPatch/ (non tracked da git, ma per sicurezza)
+        git("add", "-A")
+        canary_ver = get_canary_version()
+        msg = (
+            f"chore(emaxlele-dev): save pending work before sync\n\n"
+            f"Auto-commit by fixPatch/sync.py — salva modifiche pending\n"
+            f"prima del merge upstream/canary ({canary_ver})."
+        )
+        ok, _, err = git_soft("commit", "-m", msg)
+        if ok:
+            print("  Commit pending work OK")
+        else:
+            print(f"  Nessuna modifica da committare: {err}")
+    else:
+        print("  Working tree pulito — niente da committare")
+
+    # 2) Push se ci sono commit non pushati
+    _, ahead, _ = git_soft("rev-list", "--count", "origin/emaxlele-dev..HEAD")
+    count = int(ahead.strip()) if ahead.strip().isdigit() else 0
+    if count > 0:
+        print(f"  {count} commit non pushati — push...")
+        ok, _, err = git_soft("push", "origin", "emaxlele-dev")
+        if ok:
+            print("  Push OK — base sicura")
+        else:
+            print(f"  [WARN] Push fallito: {err}")
+            print("  Continuo comunque — i commit sono salvi localmente")
+    else:
+        print("  Nessun commit non pushato")
+        
+        
 # ── get_canary_version ─────────────────────────────────────────────────────
 
 def get_canary_version():
@@ -121,12 +165,6 @@ def merge_canary():
     git("fetch", "upstream")
 
     canary_ver = get_canary_version()
-
-    _, dirty, _ = git_soft("status", "--porcelain")
-    if dirty.strip():
-        print("  Working tree sporco — checkout --. (fixPatch/ ignorata da git, intatta)")
-        git("checkout", "--", ".")
-        print("  Checkout OK — file tracked ripristinati a HEAD")
 
     ok, out, err = git_soft("merge", "--no-edit", "-X", "theirs", "upstream/canary")
     if ok:
@@ -350,12 +388,13 @@ if __name__ == "__main__":
     print(f"fixPatch/sync.py — repo: {REPO}")
     canary_ver = get_canary_version()
     print(f"  upstream canary version: {canary_ver}")
-    merge_canary()
-    clean_workflows()
-    applied = apply_patches()
-    commit_and_ensure_exclusive(applied)
-    pull_rebase()
-    push()
+    save_pending_work()                    # Step 0
+    merge_canary()                         # Step 1
+    clean_workflows()                      # Step 1b
+    applied = apply_patches()              # Step 2
+    commit_and_ensure_exclusive(applied)   # Step 3
+    pull_rebase()                          # Step 4a
+    push()                                 # Step 4b
     section("DONE")
     if DRY_RUN:
         print(f"  DRY-RUN completato — nessuna modifica effettuata.")
