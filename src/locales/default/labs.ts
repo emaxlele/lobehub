@@ -13,8 +13,8 @@ export default {
   'features.inputMarkdown.desc':
     'Render Markdown in the input area in real time (bold text, code blocks, tables, etc.).',
   'features.inputMarkdown.title': 'Input Markdown Rendering',
-  'features.messenger.desc':
-    'Enable messaging app integrations for chatting with Lobe AI outside the web app.',
-  'features.messenger.title': 'Messenger',
+  'features.platformAgent.desc':
+    'Show the "Add Platform Agent" entry in the create menu. Platform agents (e.g. OpenClaw, Hermes) run on a connected device and communicate back via lh connect.',
+  'features.platformAgent.title': 'Platform Agent Creation',
   'title': 'Labs',
 };

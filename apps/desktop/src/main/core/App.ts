@@ -32,6 +32,7 @@ import { createLogger } from '@/utils/logger';
 import { BrowserManager } from './browser/BrowserManager';
 import { I18nManager } from './infrastructure/I18nManager';
 import { IoCContainer } from './infrastructure/IoCContainer';
+import { LocalFileProtocolManager } from './infrastructure/LocalFileProtocolManager';
 import { ProtocolManager } from './infrastructure/ProtocolManager';
 import { RendererUrlManager } from './infrastructure/RendererUrlManager';
 import { StaticFileServerManager } from './infrastructure/StaticFileServerManager';
@@ -63,6 +64,7 @@ export class App {
   staticFileServerManager: StaticFileServerManager;
   protocolManager: ProtocolManager;
   rendererUrlManager: RendererUrlManager;
+  localFileProtocolManager: LocalFileProtocolManager;
   toolDetectorManager: ToolDetectorManager;
   screenCaptureManager: ScreenCaptureManager;
   chromeFlags: string[] = ['OverlayScrollbar', 'FluentOverlayScrollbar', 'FluentScrollbar'];
@@ -103,6 +105,10 @@ export class App {
     this.storeManager = new StoreManager(this);
 
     this.rendererUrlManager = new RendererUrlManager();
+    this.localFileProtocolManager = new LocalFileProtocolManager();
+    void this.localFileProtocolManager.approveWorkspaceRoots(
+      this.storeManager.get('localFileWorkspaceRoots', []),
+    );
     protocol.registerSchemesAsPrivileged([
       {
         privileges: {
@@ -115,6 +121,7 @@ export class App {
         scheme: ELECTRON_BE_PROTOCOL_SCHEME,
       },
       this.rendererUrlManager.protocolScheme,
+      this.localFileProtocolManager.protocolScheme,
     ]);
 
     // load controllers
@@ -152,6 +159,10 @@ export class App {
     // Configure renderer loading strategy (dev server vs static export)
     // should register before app ready
     this.rendererUrlManager.configureRendererLoader();
+
+    // Serves arbitrary local files (e.g. project file previews) via
+    // `localfile://` to the renderer. Active in both dev and prod.
+    this.localFileProtocolManager.registerHandler();
 
     // initialize protocol handlers
     this.protocolManager.initialize();

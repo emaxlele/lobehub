@@ -6,12 +6,14 @@ import type { PipelineContext, ProcessorOptions } from '../types';
 const log = debug('context-engine:provider:OnboardingContextInjector');
 
 export interface OnboardingContext {
-  /** Whether onboarding has been completed — when true, all injectors must skip */
-  finished?: boolean;
+  /** User messages observed after discovery began */
+  discoveryUserMessageCount?: number;
   /** User persona document content (markdown) */
   personaContent?: string | null;
   /** Formatted phase guidance from getOnboardingState */
   phaseGuidance: string;
+  /** Recommended discovery exchanges still remaining */
+  remainingDiscoveryExchanges?: number;
   /** SOUL.md document content */
   soulContent?: string | null;
   /** Initial account profile fields, usually sourced from OAuth or profile sync */

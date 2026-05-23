@@ -15,6 +15,7 @@ import { type ToolsEngine } from '@lobechat/context-engine';
 import { buildTaskDetailPrompt, buildTaskListPrompt } from '@lobechat/prompts';
 import {
   type ConversationContext,
+  type MessageMetadata,
   type RuntimeInitialContext,
   type UIChatMessage,
 } from '@lobechat/types';
@@ -473,6 +474,7 @@ export class StreamingExecutorActionImpl {
     initialContext?: AgentRuntimeContext;
     initialState?: AgentState;
     inPortalThread?: boolean;
+    metadata?: Pick<MessageMetadata, 'trigger'>;
     messages: UIChatMessage[];
     operationId?: string;
     parentMessageId: string;
@@ -543,6 +545,7 @@ export class StreamingExecutorActionImpl {
         parentMessageType,
         threadId: threadId ?? undefined,
         topicId: topicId ?? undefined,
+        ...(parentMessageType === 'user' ? { triggerMessageId: parentMessageId } : {}),
       },
       sourceId: `${operationId}:client:start`,
       sourceType: 'client.runtime.start',
@@ -610,6 +613,7 @@ export class StreamingExecutorActionImpl {
       executors: createAgentExecutors({
         agentConfig, // Pass pre-resolved config to callLLM executor
         get: this.#get,
+        metadata: params.metadata,
         messageKey,
         operationId,
         parentId: params.parentMessageId,
@@ -649,11 +653,13 @@ export class StreamingExecutorActionImpl {
       void emitClientAgentSignalSourceEvent({
         payload: {
           agentId,
+          ...(assistantMessageId ? { anchorMessageId: assistantMessageId } : {}),
           assistantMessageId,
           operationId,
           status: normalizeClientRuntimeCompleteStatus(state.status, operationStatus),
           threadId: threadId ?? undefined,
           topicId: topicId ?? undefined,
+          ...(parentMessageType === 'user' ? { triggerMessageId: parentMessageId } : {}),
         },
         sourceId: `${operationId}:client:complete`,
         sourceType: 'client.runtime.complete',

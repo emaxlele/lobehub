@@ -1,5 +1,6 @@
 import { PageAgentIdentifier } from '@lobechat/builtin-tool-page-agent';
 import { SELF_FEEDBACK_INTENT_IDENTIFIER } from '@lobechat/builtin-tool-self-iteration';
+import { RequestTrigger } from '@lobechat/types';
 import type * as ModelBankModule from 'model-bank';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,7 @@ import { AiAgentService } from '../index';
 const {
   mockCreateOperation,
   mockGetAgentConfig,
+  mockGetInfoForAIGeneration,
   mockIsAgentSignalEnabledForUser,
   mockMessageCreate,
   mockMessageQuery,
@@ -18,6 +20,7 @@ const {
 } = vi.hoisted(() => ({
   mockCreateOperation: vi.fn(),
   mockGetAgentConfig: vi.fn(),
+  mockGetInfoForAIGeneration: vi.fn(),
   mockIsAgentSignalEnabledForUser: vi.fn(),
   mockMessageCreate: vi.fn(),
   mockMessageQuery: vi.fn(),
@@ -70,9 +73,7 @@ vi.mock('@/server/services/agentSignal/featureGate', () => ({
     agentSelfIterationEnabled?: boolean;
     isAgentSelfIterationFeatureEnabled: boolean;
     isLobeAiAgent: boolean;
-  }) =>
-    isAgentSelfIterationFeatureEnabled &&
-    (isLobeAiAgent || agentSelfIterationEnabled === true),
+  }) => isAgentSelfIterationFeatureEnabled && (isLobeAiAgent || agentSelfIterationEnabled === true),
 }));
 
 vi.mock('@/server/services/agentSignal', () => ({
@@ -97,6 +98,12 @@ vi.mock('@/database/models/thread', () => ({
     findById: vi.fn(),
     update: vi.fn(),
   })),
+}));
+
+vi.mock('@/database/models/user', () => ({
+  UserModel: {
+    getInfoForAIGeneration: mockGetInfoForAIGeneration,
+  },
 }));
 
 vi.mock('@/database/models/task', () => ({
@@ -180,6 +187,10 @@ describe('AiAgentService.execAgent - builtin agent runtime config', () => {
     mockMessageQuery.mockResolvedValue([]);
     mockIsAgentSignalEnabledForUser.mockResolvedValue(true);
     mockResolveTask.mockResolvedValue(null);
+    mockGetInfoForAIGeneration.mockResolvedValue({
+      responseLanguage: 'en-US',
+      userName: 'Test User',
+    });
     mockToolsEnv.VISUAL_UNDERSTANDING_MODEL = 'vision-model';
     mockToolsEnv.VISUAL_UNDERSTANDING_PROVIDER = 'test-provider';
     mockCreateOperation.mockResolvedValue({
@@ -213,6 +224,33 @@ describe('AiAgentService.execAgent - builtin agent runtime config', () => {
     const callArgs = mockCreateOperation.mock.calls[0][0];
     expect(callArgs.agentConfig.systemRole).toContain('You are Lobe');
     expect(callArgs.agentConfig.systemRole).toContain('{{model}}');
+  });
+
+  it('should pass user response language into web onboarding runtime systemRole', async () => {
+    mockGetInfoForAIGeneration.mockResolvedValue({
+      responseLanguage: 'zh-CN',
+      userName: 'Test User',
+    });
+    mockGetAgentConfig.mockResolvedValue({
+      chatConfig: {},
+      id: 'agent-web-onboarding',
+      model: 'gpt-4',
+      plugins: [],
+      provider: 'openai',
+      slug: 'web-onboarding',
+      systemRole: '',
+    });
+
+    await service.execAgent({
+      agentId: 'agent-web-onboarding',
+      prompt: '你好',
+    });
+
+    const callArgs = mockCreateOperation.mock.calls[0][0];
+    expect(callArgs.agentConfig.systemRole).toContain('Preferred reply language: zh-CN');
+    expect(callArgs.agentConfig.systemRole).toContain(
+      'Every visible reply, question, and visible choice label must be entirely in zh-CN',
+    );
   });
 
   it('should NOT override user-customized systemRole for inbox agent', async () => {
@@ -274,6 +312,32 @@ describe('AiAgentService.execAgent - builtin agent runtime config', () => {
 
     const callArgs = mockCreateOperation.mock.calls[0][0];
     expect(callArgs.agentConfig.systemRole).toBe('');
+  });
+
+  it('should persist request trigger metadata on the created user message', async () => {
+    mockGetAgentConfig.mockResolvedValue({
+      chatConfig: {},
+      id: 'agent-custom',
+      model: 'gpt-4',
+      plugins: [],
+      provider: 'openai',
+      systemRole: '',
+    });
+
+    await service.execAgent({
+      agentId: 'agent-custom',
+      appContext: { topicId: 'topic-1' },
+      prompt: 'Hello',
+      trigger: RequestTrigger.Onboarding,
+    });
+
+    expect(mockMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: 'Hello',
+        metadata: { trigger: RequestTrigger.Onboarding },
+        role: 'user',
+      }),
+    );
   });
 
   it('should inject self-feedback intent tool for Lobe AI when user gate is enabled', async () => {

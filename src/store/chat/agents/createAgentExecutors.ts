@@ -18,15 +18,16 @@ import type {
   SubAgentResultPayload,
   SubAgentsBatchResultPayload,
 } from '@lobechat/agent-runtime';
-import { calculateMessageTokens, UsageCounter } from '@lobechat/agent-runtime';
+import { UsageCounter } from '@lobechat/agent-runtime';
 import { isDesktop } from '@lobechat/const';
-import type { ToolsEngine } from '@lobechat/context-engine';
+import { countContextTokens, type ToolsEngine } from '@lobechat/context-engine';
 import { chainCompressContext } from '@lobechat/prompts';
 import {
   type ChatMessageError,
   type ChatToolPayload,
   type ConversationContext,
   type CreateMessageParams,
+  type MessageMetadata,
   type MessageToolCall,
   type ModelUsage,
   TraceNameMap,
@@ -147,6 +148,7 @@ export const createAgentExecutors = (context: {
   /** Pre-resolved agent config with isSubAgent filtering applied */
   agentConfig: ResolvedAgentConfig;
   get: () => ChatStore;
+  metadata?: Pick<MessageMetadata, 'trigger'>;
   messageKey: string;
   operationId: string;
   parentId: string;
@@ -320,7 +322,7 @@ export const createAgentExecutors = (context: {
       // Expand dynamically activated tools (from lobe-activator activateTools API)
       // and merge them into the agent config for this LLM call.
       // Built before the StreamingHandler so we can bind the offered tool
-      // names into the transformToolCalls callback (LOBE-8696).
+      // names into the transformToolCalls callback ().
       const activatedToolIds = runtimeContext?.stepContext?.activatedToolIds;
       let resolvedAgentConfig = context.agentConfig;
 
@@ -477,6 +479,7 @@ export const createAgentExecutors = (context: {
           ...agentConfigData.params,
         },
         initialContext: runtimeContext?.initialContext,
+        metadata: context.metadata,
         stepContext: runtimeContext?.stepContext,
         trace: {
           traceId,
@@ -2824,7 +2827,9 @@ export const createAgentExecutors = (context: {
         events.push({ type: 'compression_complete', groupId, parentMessageId });
 
         // Calculate new token count
-        const compressedTokenCount = calculateMessageTokens(compressedMessages);
+        const compressedTokenCount = countContextTokens({
+          messages: compressedMessages,
+        }).rawTotal;
 
         return {
           events,

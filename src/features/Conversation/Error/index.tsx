@@ -6,7 +6,7 @@ import { type ChatMessageError, type ErrorType, type IToolErrorType } from '@lob
 import { ChatErrorType } from '@lobechat/types';
 import { type AlertProps } from '@lobehub/ui';
 import { Block, Highlighter, Skeleton } from '@lobehub/ui';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,6 +14,7 @@ import useBusinessErrorAlertConfig from '@/business/client/hooks/useBusinessErro
 import useBusinessErrorContent from '@/business/client/hooks/useBusinessErrorContent';
 import useRenderBusinessChatErrorMessageExtra from '@/business/client/hooks/useRenderBusinessChatErrorMessageExtra';
 import ErrorContent from '@/features/Conversation/ChatItem/components/ErrorContent';
+import { useConversationStore } from '@/features/Conversation/store';
 import HeterogeneousAgentStatusGuide from '@/features/Electron/HeterogeneousAgent/StatusGuide';
 import { useProviderName } from '@/hooks/useProviderName';
 import dynamic from '@/libs/next/dynamic';
@@ -76,6 +77,7 @@ const OllamaSetupGuide = dynamic(() => import('./OllamaSetupGuide'), {
 const HETEROGENEOUS_AGENT_STATUS_GUIDE_ERROR_CODES = new Set<string>([
   HeterogeneousAgentSessionErrorCode.AuthRequired,
   HeterogeneousAgentSessionErrorCode.CliNotFound,
+  HeterogeneousAgentSessionErrorCode.Overloaded,
   HeterogeneousAgentSessionErrorCode.RateLimit,
 ]);
 
@@ -171,9 +173,10 @@ export const useErrorContent = (error: any) => {
 interface ErrorExtraProps {
   data: ErrorMessageData;
   error?: AlertProps;
+  onRegenerate?: () => void;
 }
 
-const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) => {
+const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data, onRegenerate }) => {
   const error = data.error;
   const navigate = useNavigate();
   const businessChatErrorMessageExtra = useRenderBusinessChatErrorMessageExtra(error, data.id);
@@ -181,7 +184,16 @@ const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) =>
   const sessionErrorBody = error?.body;
   const rawErrorMessage = getRawErrorMessage(error) || alertError?.message;
 
-  if (enableBusinessFeatures && businessChatErrorMessageExtra) return businessChatErrorMessageExtra;
+  const regenerateAssistantMessage = useConversationStore((s) => s.regenerateAssistantMessage);
+  const deleteMessage = useConversationStore((s) => s.deleteMessage);
+  const handleRetryAgentMessage = useCallback(() => {
+    if (onRegenerate) {
+      onRegenerate();
+      return;
+    }
+    regenerateAssistantMessage(data.id);
+    if (data.error) deleteMessage(data.id);
+  }, [data.error, data.id, deleteMessage, onRegenerate, regenerateAssistantMessage]);
 
   if (isHeterogeneousAgentStatusGuideError(sessionErrorBody)) {
     return (
@@ -189,9 +201,12 @@ const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) =>
         agentType={sessionErrorBody.agentType}
         error={sessionErrorBody}
         onOpenSystemTools={() => navigate('/settings/system-tools')}
+        onRetry={handleRetryAgentMessage}
       />
     );
   }
+
+  if (enableBusinessFeatures && businessChatErrorMessageExtra) return businessChatErrorMessageExtra;
 
   switch (error?.type) {
     case AgentRuntimeErrorType.OllamaServiceUnavailable: {
@@ -234,6 +249,7 @@ const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) =>
           </Highlighter>
         ) : undefined,
       }}
+      onRegenerate={onRegenerate}
     />
   );
 });

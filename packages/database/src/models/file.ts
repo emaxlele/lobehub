@@ -95,8 +95,9 @@ export class FileModel {
   updateGlobalFile = async (
     hashId: string,
     data: Partial<Pick<NewGlobalFile, 'metadata' | 'url'>>,
+    trx?: Transaction,
   ) => {
-    return this.db.update(globalFiles).set(data).where(eq(globalFiles.hashId, hashId));
+    return (trx ?? this.db).update(globalFiles).set(data).where(eq(globalFiles.hashId, hashId));
   };
 
   checkHash = async (hash: string) => {
@@ -176,8 +177,9 @@ export class FileModel {
     return this.db.delete(globalFiles).where(eq(globalFiles.hashId, hashId));
   };
 
-  countUsage = async () => {
-    const result = await this.db
+  countUsage = async (trx?: Transaction) => {
+    const db = trx ?? this.db;
+    const result = await db
       .select({
         totalSize: sum(files.size),
       })
